@@ -1,31 +1,209 @@
-# swift-rfc-1123
+# Swift RFC 1123
 
-Swift implementation of [RFC 1123: Requirements for Internet Hosts Application and Support](https://www.rfc-editor.org/rfc/rfc1123.html)
+[![CI](https://github.com/swift-standards/swift-rfc-1123/workflows/CI/badge.svg)](https://github.com/swift-standards/swift-rfc-1123/actions/workflows/ci.yml)
+![Development Status](https://img.shields.io/badge/status-active--development-blue.svg)
+
+Swift implementation of RFC 1123: Requirements for Internet Hosts - Application and Support.
+
+## Overview
+
+RFC 1123 updates RFC 1035 with relaxed domain name syntax rules for modern internet hosts. This package provides a pure Swift implementation of RFC 1123-compliant hostnames with full validation, type-safe label handling, and convenient APIs for working with host hierarchies.
+
+The package enforces RFC 1123 rules which allow labels to begin with digits (unlike RFC 1035), while maintaining stricter TLD requirements (must start and end with letters). It provides seamless conversion between RFC 1035 and RFC 1123 domain representations.
+
+## Features
+
+- **RFC 1123 Compliance**: Full validation of hostname syntax according to RFC 1123 specification
+- **Relaxed Label Rules**: Labels can begin with digits (e.g., "123.example.com" is valid)
+- **Strict TLD Validation**: Top-level domains must start and end with letters
+- **RFC 1035 Interoperability**: Seamless conversion between RFC 1035 and RFC 1123 domains
+- **Type-Safe Labels**: Label type that enforces RFC 1123 rules at compile time
+- **Domain Hierarchy**: Navigate parent domains, root domains, and detect subdomain relationships
+- **Codable Support**: Full Codable conformance for JSON encoding/decoding
 
 ## Installation
 
-### Swift Package Manager
-
-Add this to your Package.swift:
+Add swift-rfc-1123 to your package dependencies:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/swift-web-standards/swift-rfc-1123.git", branch: "main")
+    .package(url: "https://github.com/swift-standards/swift-rfc-1123.git", from: "0.1.0")
 ]
 ```
 
-## Usage
+Then add it to your target:
+
+```swift
+.target(
+    name: "YourTarget",
+    dependencies: [
+        .product(name: "RFC_1123", package: "swift-rfc-1123")
+    ]
+)
+```
+
+## Quick Start
+
+### Creating Hostnames
 
 ```swift
 import RFC_1123
 
-// TODO: Add usage examples
+// Create from string
+let host = try Domain("example.com")
+
+// RFC 1123 allows labels starting with digits
+let numericHost = try Domain("123.example.com")
+
+// Create from root components
+let host = try Domain.root("example", "com")
+
+// Create subdomain with reversed components
+let host = try Domain.subdomain("com", "example", "api")
+// Result: "api.example.com"
 ```
 
-## Documentation
+### Working with Domain Components
 
-For complete documentation of RFC 1123, see the [official RFC document](https://www.rfc-editor.org/rfc/rfc1123.html).
+```swift
+let host = try Domain("api.example.com")
+
+// Access TLD and SLD
+print(host.tld?.stringValue)  // "com"
+print(host.sld?.stringValue)  // "example"
+
+// Get full hostname
+print(host.name)  // "api.example.com"
+```
+
+### Domain Hierarchy Navigation
+
+```swift
+let host = try Domain("api.v1.example.com")
+
+// Get parent domain
+let parent = try host.parent()
+print(parent?.name)  // "v1.example.com"
+
+// Get root domain (TLD + SLD)
+let root = try host.root()
+print(root?.name)  // "example.com"
+
+// Add subdomain
+let subdomain = try host.addingSubdomain("staging")
+print(subdomain.name)  // "staging.api.v1.example.com"
+
+// Check subdomain relationships
+let parent = try Domain("example.com")
+let child = try Domain("api.example.com")
+print(child.isSubdomain(of: parent))  // true
+```
+
+### RFC 1035 Interoperability
+
+```swift
+import RFC_1035
+import RFC_1123
+
+// Convert RFC 1035 domain to RFC 1123
+let rfc1035Domain = try RFC_1035.Domain("example.com")
+let rfc1123Domain = try RFC_1123.Domain(rfc1035Domain)
+
+// Convert RFC 1123 domain to RFC 1035
+let backToRFC1035 = try rfc1123Domain.toRFC1035()
+```
+
+## Usage
+
+### Domain Type
+
+The core `Domain` type is a struct that validates and stores hostnames:
+
+```swift
+public struct Domain: Hashable, Sendable {
+    public init(_ string: String) throws
+    public init(labels: [String]) throws
+
+    public var name: String
+    public var tld: Domain.Label?
+    public var sld: Domain.Label?
+
+    public func isSubdomain(of parent: Domain) -> Bool
+    public func addingSubdomain(_ components: [String]) throws -> Domain
+    public func addingSubdomain(_ components: String...) throws -> Domain
+    public func parent() throws -> Domain?
+    public func root() throws -> Domain?
+}
+```
+
+### Validation Rules
+
+RFC 1123 enforces the following rules:
+
+- **Label Length**: Each label must be 1-63 characters
+- **Total Length**: Complete hostname must not exceed 255 characters
+- **Label Count**: Maximum 127 labels
+- **Regular Label Format**:
+  - Can start with letter or digit (a-z, A-Z, 0-9)
+  - Can end with letter or digit
+  - May contain letters, digits, and hyphens in interior positions
+- **TLD Format** (stricter):
+  - Must start with a letter (a-z, A-Z)
+  - Must end with a letter
+  - May contain letters, digits, and hyphens in interior positions
+
+### Key Differences from RFC 1035
+
+| Rule | RFC 1035 | RFC 1123 |
+|------|----------|----------|
+| Label can start with digit | No | Yes |
+| TLD can start with digit | No | No |
+| TLD can end with digit | No | No |
+
+### Error Handling
+
+```swift
+do {
+    let host = try Domain("example.com")
+} catch Domain.ValidationError.empty {
+    print("Host cannot be empty")
+} catch Domain.ValidationError.tooLong(let length) {
+    print("Host length \(length) exceeds maximum")
+} catch Domain.ValidationError.tooManyLabels {
+    print("Too many labels in host")
+} catch Domain.ValidationError.invalidLabel(let label) {
+    print("Invalid label: \(label)")
+} catch Domain.ValidationError.invalidTLD(let tld) {
+    print("Invalid TLD: \(tld)")
+}
+```
+
+### Codable Support
+
+```swift
+let host = try Domain("example.com")
+
+// Encode to JSON
+let encoded = try JSONEncoder().encode(host)
+
+// Decode from JSON
+let decoded = try JSONDecoder().decode(Domain.self, from: encoded)
+```
+
+## Related Packages
+
+### Dependencies
+- [swift-rfc-1035](https://github.com/swift-standards/swift-rfc-1035) - RFC 1035 domain names (stricter predecessor)
+
+## Requirements
+
+- Swift 6.0+
+- macOS 13.0+ / iOS 16.0+
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This library is released under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

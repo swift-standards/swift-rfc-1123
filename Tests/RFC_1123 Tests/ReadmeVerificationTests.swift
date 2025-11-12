@@ -1,0 +1,114 @@
+//
+//  ReadmeVerificationTests.swift
+//  swift-rfc-1123
+//
+//  Verifies that README code examples actually work
+//
+
+import Foundation
+import RFC_1035
+import RFC_1123
+import Testing
+
+@Suite("README Verification")
+struct ReadmeVerificationTests {
+
+    @Test("README Line 53: Create from string")
+    func createFromString() throws {
+        let host = try RFC_1123.Domain("example.com")
+
+        #expect(host.name == "example.com")
+    }
+
+    @Test("README Line 55-56: RFC 1123 allows labels starting with digits")
+    func numericLabels() throws {
+        let numericHost = try RFC_1123.Domain("123.example.com")
+
+        #expect(numericHost.name == "123.example.com")
+    }
+
+    @Test("README Line 58-59: Create from root components")
+    func createFromRootComponents() throws {
+        let host = try RFC_1123.Domain.root("example", "com")
+
+        #expect(host.name == "example.com")
+    }
+
+    @Test("README Line 61-63: Create subdomain with reversed components")
+    func createSubdomainReversed() throws {
+        let host = try RFC_1123.Domain.subdomain("com", "example", "api")
+
+        #expect(host.name == "api.example.com")
+    }
+
+    @Test("README Line 69-76: Working with domain components")
+    func workingWithComponents() throws {
+        let host = try RFC_1123.Domain("api.example.com")
+
+        #expect(host.tld?.stringValue == "com")
+        #expect(host.sld?.stringValue == "example")
+        #expect(host.name == "api.example.com")
+    }
+
+    @Test("README Line 82-99: Domain hierarchy navigation")
+    func domainHierarchyNavigation() throws {
+        let host = try RFC_1123.Domain("api.v1.example.com")
+
+        // Get parent domain
+        let parent = try host.parent()
+        #expect(parent?.name == "v1.example.com")
+
+        // Get root domain
+        let root = try host.root()
+        #expect(root?.name == "example.com")
+
+        // Add subdomain
+        let subdomain = try host.addingSubdomain("staging")
+        #expect(subdomain.name == "staging.api.v1.example.com")
+
+        // Check subdomain relationships
+        let parentDomain = try RFC_1123.Domain("example.com")
+        let childDomain = try RFC_1123.Domain("api.example.com")
+        #expect(childDomain.isSubdomain(of: parentDomain))
+    }
+
+    @Test("README Line 105-113: RFC 1035 interoperability")
+    func rfc1035Interoperability() throws {
+        // Convert RFC 1035 domain to RFC 1123
+        let rfc1035Domain = try RFC_1035.Domain("example.com")
+        let rfc1123Domain = try RFC_1123.Domain(rfc1035Domain)
+
+        #expect(rfc1123Domain.name == "example.com")
+
+        // Convert RFC 1123 domain to RFC 1035
+        let backToRFC1035 = try rfc1123Domain.toRFC1035()
+
+        #expect(backToRFC1035.name == "example.com")
+    }
+
+    @Test("README Line 166-178: Error handling")
+    func errorHandling() throws {
+        // Empty host
+        #expect(throws: RFC_1123.Domain.ValidationError.empty) {
+            _ = try RFC_1123.Domain("")
+        }
+
+        // Invalid TLD starting with number
+        #expect(throws: RFC_1123.Domain.ValidationError.invalidTLD("123com")) {
+            _ = try RFC_1123.Domain("example.123com")
+        }
+    }
+
+    @Test("README Line 184-190: Codable support")
+    func codableSupport() throws {
+        let host = try RFC_1123.Domain("example.com")
+
+        // Encode to JSON
+        let encoded = try JSONEncoder().encode(host)
+
+        // Decode from JSON
+        let decoded = try JSONDecoder().decode(RFC_1123.Domain.self, from: encoded)
+
+        #expect(host == decoded)
+    }
+}

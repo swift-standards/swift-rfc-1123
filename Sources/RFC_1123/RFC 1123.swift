@@ -47,7 +47,17 @@ public struct Domain: Hashable, Sendable {
 
     /// Initialize from a string representation (e.g. "host.example.com")
     public init(_ string: String) throws {
-        try self.init(labels: string.split(separator: ".", omittingEmptySubsequences: true).map(String.init))
+        try self.init(
+            labels: string.split(separator: ".", omittingEmptySubsequences: true).map(String.init)
+        )
+    }
+}
+
+// MARK: - Label Validation Type
+extension Domain {
+    enum ValidationType {
+        case label  // Regular label rules
+        case tld  // Stricter TLD rules
     }
 }
 
@@ -55,22 +65,21 @@ public struct Domain: Hashable, Sendable {
 extension Domain {
     /// A type-safe host label that enforces RFC 1123 rules
     public struct Label: Hashable, Sendable {
-        enum ValidationType {
-            case label  // Regular label rules
-            case tld    // Stricter TLD rules
-        }
-
         private let value: String
 
         /// Initialize a label, validating RFC 1123 rules
         internal init(_ string: String, validateAs type: ValidationType) throws {
             guard !string.isEmpty, string.count <= Domain.Limits.maxLabelLength else {
-                throw type == .tld ? Domain.ValidationError.invalidTLD(string) : Domain.ValidationError.invalidLabel(string)
+                throw type == .tld
+                    ? Domain.ValidationError.invalidTLD(string)
+                    : Domain.ValidationError.invalidLabel(string)
             }
 
             let regex = type == .tld ? Domain.tldRegex : Domain.labelRegex
             guard (try? regex.wholeMatch(in: string)) != nil else {
-                throw type == .tld ? Domain.ValidationError.invalidTLD(string) : Domain.ValidationError.invalidLabel(string)
+                throw type == .tld
+                    ? Domain.ValidationError.invalidTLD(string)
+                    : Domain.ValidationError.invalidLabel(string)
             }
 
             self.value = string
@@ -164,9 +173,11 @@ extension Domain {
             case .tooManyLabels:
                 return "Host name has too many labels (maximum \(Limits.maxLabels))"
             case .invalidLabel(let label):
-                return "Invalid label '\(label)'. Must start and end with letter/digit, and contain only letters/digits/hyphens"
+                return
+                    "Invalid label '\(label)'. Must start and end with letter/digit, and contain only letters/digits/hyphens"
             case .invalidTLD(let tld):
-                return "Invalid TLD '\(tld)'. Must start and end with letter, and contain only letters/digits/hyphens"
+                return
+                    "Invalid TLD '\(tld)'. Must start and end with letter, and contain only letters/digits/hyphens"
             }
         }
     }
