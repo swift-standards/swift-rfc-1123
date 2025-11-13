@@ -221,20 +221,12 @@ extension Domain: RawRepresentable {
 
 extension RFC_1123.Domain {
     public init(_ domain: RFC_1035.Domain) throws {
-        self = try RFC_1123.Domain(domain.name)
-    }
-
-    public func toRFC1035() throws -> RFC_1035.Domain {
-        try RFC_1035.Domain(self.name)
+        try self.init(domain.name)
     }
 }
 
 extension RFC_1035.Domain {
     public init(_ domain: RFC_1123.Domain) throws {
         try self.init(domain.name)
-    }
-
-    public func toRFC1123() throws -> RFC_1123.Domain {
-        try RFC_1123.Domain(self.name)
     }
 }
